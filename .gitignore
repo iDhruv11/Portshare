@@ -1,2 +1,5 @@
 .mvn
-*.txt
+temp/
+..iml
+.idea/
+target/
