@@ -1,23 +1,20 @@
 package portshare.controller;
 
-import portshare.service.FileSharer;
-
-import java.io.*;
-import java.util.UUID;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-
 import com.sun.net.httpserver.Headers;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpHandler;
 import com.sun.net.httpserver.HttpServer;
-
+import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-
+import java.util.UUID;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import org.apache.commons.io.IOUtils;
+import portshare.service.FileSharer;
 
 public class FileController {
+
   private final FileSharer fileSharer;
   private final HttpServer server;
   private final String uploadDir;
@@ -26,7 +23,9 @@ public class FileController {
   public FileController(int port) throws IOException {
     this.fileSharer = new FileSharer();
     this.server = HttpServer.create(new InetSocketAddress(port), 0);
-    this.uploadDir = System.getProperty("java.io.tmpdir") + File.separator + "portshare-uploads";
+    this.uploadDir = System.getProperty("java.io.tmpdir") +
+        File.separator +
+        "portshare-uploads";
     this.executorService = Executors.newFixedThreadPool(10);
 
     File uploadDirFile = new File(uploadDir);
@@ -43,7 +42,8 @@ public class FileController {
 
   public void start() {
     server.start();
-    System.out.println("API server started on port " + server.getAddress().getPort());
+    System.out.println(
+        "API server started on port " + server.getAddress().getPort());
   }
 
   public void stop() {
@@ -53,12 +53,15 @@ public class FileController {
   }
 
   private class CORSHandler implements HttpHandler {
+
     @Override
     public void handle(HttpExchange exchange) throws IOException {
       Headers headers = exchange.getResponseHeaders();
       headers.add("Access-Control-Allow-Origin", "*");
       headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      headers.add("Access-Control-Allow-Headers", "Content-Type,Authorization");
+      headers.add(
+          "Access-Control-Allow-Headers",
+          "Content-Type,Authorization");
 
       if (exchange.getRequestMethod().equalsIgnoreCase("OPTIONS")) {
         exchange.sendResponseHeaders(204, -1);
@@ -74,6 +77,7 @@ public class FileController {
   }
 
   private static class MultipartParser {
+
     private final byte[] data;
     private final String boundary;
 
@@ -94,16 +98,24 @@ public class FileController {
 
         filenameStart += filenameMarker.length();
         int filenameEnd = dataAsString.indexOf("\"", filenameStart);
-        String filename = dataAsString.substring(filenameStart, filenameEnd);
+        String filename = dataAsString.substring(
+            filenameStart,
+            filenameEnd);
 
         String contentTypeMarker = "Content-Type: ";
-        int contentTypeStart = dataAsString.indexOf(contentTypeMarker, filenameEnd);
+        int contentTypeStart = dataAsString.indexOf(
+            contentTypeMarker,
+            filenameEnd);
         String contentType = "application/octet-stream"; // Default
 
         if (contentTypeStart != -1) {
           contentTypeStart += contentTypeMarker.length();
-          int contentTypeEnd = dataAsString.indexOf("\r\n", contentTypeStart);
-          contentType = dataAsString.substring(contentTypeStart, contentTypeEnd);
+          int contentTypeEnd = dataAsString.indexOf(
+              "\r\n",
+              contentTypeStart);
+          contentType = dataAsString.substring(
+              contentTypeStart,
+              contentTypeEnd);
         }
 
         String headerEndMarker = "\r\n\r\n";
@@ -115,11 +127,17 @@ public class FileController {
         int contentStart = headerEnd + headerEndMarker.length();
 
         byte[] boundaryBytes = ("\r\n--" + boundary + "--").getBytes();
-        int contentEnd = findSequence(data, boundaryBytes, contentStart);
+        int contentEnd = findSequence(
+            data,
+            boundaryBytes,
+            contentStart);
 
         if (contentEnd == -1) {
           boundaryBytes = ("\r\n--" + boundary).getBytes();
-          contentEnd = findSequence(data, boundaryBytes, contentStart);
+          contentEnd = findSequence(
+              data,
+              boundaryBytes,
+              contentStart);
         }
 
         if (contentEnd == -1 || contentEnd <= contentStart) {
@@ -127,11 +145,17 @@ public class FileController {
         }
 
         byte[] fileContent = new byte[contentEnd - contentStart];
-        System.arraycopy(data, contentStart, fileContent, 0, fileContent.length);
+        System.arraycopy(
+            data,
+            contentStart,
+            fileContent,
+            0,
+            fileContent.length);
 
         return new ParseResult(filename, contentType, fileContent);
       } catch (Exception e) {
-        System.err.println("Error parsing multipart data: " + e.getMessage());
+        System.err.println(
+            "Error parsing multipart data: " + e.getMessage());
         return null;
       }
     }
@@ -149,11 +173,15 @@ public class FileController {
     }
 
     public static class ParseResult {
+
       public final String filename;
       public final String contentType;
       public final byte[] fileContent;
 
-      public ParseResult(String filename, String contentType, byte[] fileContent) {
+      public ParseResult(
+          String filename,
+          String contentType,
+          byte[] fileContent) {
         this.filename = filename;
         this.contentType = contentType;
         this.fileContent = fileContent;
@@ -162,6 +190,7 @@ public class FileController {
   }
 
   private class UploadHandler implements HttpHandler {
+
     @Override
     public void handle(HttpExchange exchange) throws IOException {
       Headers headers = exchange.getResponseHeaders();
@@ -179,7 +208,8 @@ public class FileController {
       Headers requestHeaders = exchange.getRequestHeaders();
       String contentType = requestHeaders.getFirst("Content-Type");
 
-      if (contentType == null || !contentType.startsWith("multipart/form-data")) {
+      if (contentType == null ||
+          !contentType.startsWith("multipart/form-data")) {
         String response = "Bad Request: Content-Type must be multipart/form-data";
         exchange.sendResponseHeaders(400, response.getBytes().length);
         try (OutputStream os = exchange.getResponseBody()) {
@@ -189,18 +219,23 @@ public class FileController {
       }
 
       try {
-        String boundary = contentType.substring(contentType.indexOf("boundary=") + 9);
+        String boundary = contentType.substring(
+            contentType.indexOf("boundary=") + 9);
 
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         IOUtils.copy(exchange.getRequestBody(), baos);
         byte[] requestData = baos.toByteArray();
 
-        MultipartParser parser = new MultipartParser(requestData, boundary);
+        MultipartParser parser = new MultipartParser(
+            requestData,
+            boundary);
         MultipartParser.ParseResult result = parser.parse();
 
         if (result == null) {
           String response = "Bad Request: Could not parse file content";
-          exchange.sendResponseHeaders(400, response.getBytes().length);
+          exchange.sendResponseHeaders(
+              400,
+              response.getBytes().length);
           try (OutputStream os = exchange.getResponseBody()) {
             os.write(response.getBytes());
           }
@@ -212,7 +247,9 @@ public class FileController {
           filename = "unnamed-file";
         }
 
-        String uniqueFilename = UUID.randomUUID().toString() + "_" + new File(filename).getName();
+        String uniqueFilename = UUID.randomUUID().toString() +
+            "_" +
+            new File(filename).getName();
         String filePath = uploadDir + File.separator + uniqueFilename;
 
         try (FileOutputStream fos = new FileOutputStream(filePath)) {
@@ -225,13 +262,15 @@ public class FileController {
 
         String jsonResponse = "{\"port\": " + port + "}";
         headers.add("Content-Type", "application/json");
-        exchange.sendResponseHeaders(200, jsonResponse.getBytes().length);
+        exchange.sendResponseHeaders(
+            200,
+            jsonResponse.getBytes().length);
         try (OutputStream os = exchange.getResponseBody()) {
           os.write(jsonResponse.getBytes());
         }
-
       } catch (Exception e) {
-        System.err.println("Error processing file upload: " + e.getMessage());
+        System.err.println(
+            "Error processing file upload: " + e.getMessage());
         String response = "Server error: " + e.getMessage();
         exchange.sendResponseHeaders(500, response.getBytes().length);
         try (OutputStream os = exchange.getResponseBody()) {
@@ -242,6 +281,7 @@ public class FileController {
   }
 
   private class DownloadHandler implements HttpHandler {
+
     @Override
     public void handle(HttpExchange exchange) throws IOException {
       Headers headers = exchange.getResponseHeaders();
@@ -262,13 +302,14 @@ public class FileController {
       try {
         int port = Integer.parseInt(portStr);
 
-        try (Socket socket = new Socket("localhost", port);
+        try (
+            Socket socket = new Socket("localhost", port);
             InputStream socketInput = socket.getInputStream()) {
-
           File tempFile = File.createTempFile("download-", ".tmp");
           String filename = "downloaded-file"; // Default filename
 
-          try (FileOutputStream fos = new FileOutputStream(tempFile)) {
+          try (
+              FileOutputStream fos = new FileOutputStream(tempFile)) {
             byte[] buffer = new byte[4096];
             int bytesRead;
 
@@ -290,11 +331,14 @@ public class FileController {
             }
           }
 
-          headers.add("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+          headers.add(
+              "Content-Disposition",
+              "attachment; filename=\"" + filename + "\"");
           headers.add("Content-Type", "application/octet-stream");
 
           exchange.sendResponseHeaders(200, tempFile.length());
-          try (OutputStream os = exchange.getResponseBody();
+          try (
+              OutputStream os = exchange.getResponseBody();
               FileInputStream fis = new FileInputStream(tempFile)) {
             byte[] buffer = new byte[4096];
             int bytesRead;
@@ -304,17 +348,18 @@ public class FileController {
           }
 
           tempFile.delete();
-
         } catch (IOException e) {
-          System.err.println("Error downloading file: " + e.getMessage());
+          System.err.println(
+              "Error downloading file from peer: " + e.getMessage());
           String response = "Error downloading file: " + e.getMessage();
           headers.add("Content-Type", "text/plain");
-          exchange.sendResponseHeaders(500, response.getBytes().length);
+          exchange.sendResponseHeaders(
+              500,
+              response.getBytes().length);
           try (OutputStream os = exchange.getResponseBody()) {
             os.write(response.getBytes());
           }
         }
-
       } catch (NumberFormatException e) {
         String response = "Bad Request: Invalid port number";
         exchange.sendResponseHeaders(400, response.getBytes().length);
